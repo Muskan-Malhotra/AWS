@@ -1,0 +1,117 @@
+==================== code4.py ========================================
+from __future__ import print_function
+from pyzbar.pyzbar import decode
+from pyzbar.pyzbar import ZBarSymbol
+import cv2
+
+
+#C:\Users\V4SWHVY\Desktop\python_barCode\cropped.jpg
+pic_path = r"C:\Users\V4SWHVY\Desktop\python_barCode\images\image2.jpg"
+# preprocessing using opencv
+im = cv2.imread(pic_path, cv2.IMREAD_GRAYSCALE)
+ret, bw_im = cv2.threshold(im, 50, 255, cv2.THRESH_BINARY)
+cv2.imwrite('barcode_opencv.jpg', im)
+cv2.imwrite('barcode.jpg', bw_im)
+# zbar
+barcodes = decode(bw_im)
+print(barcodes)
+
+# Display barcode and QR code location  
+# def display(im, decodedObjects):
+
+#     # Loop over all decoded objects
+#     for decodedObject in decodedObjects: 
+#         points = decodedObject.polygon
+
+#         # If the points do not form a quad, find convex hull
+#         if len(points) > 4 : 
+#             hull = cv2.convexHull(np.array([point for point in points], dtype=np.float32))
+#             hull = list(map(tuple, np.squeeze(hull)))
+#         else : 
+#             hull = points
+
+#         # Number of points in the convex hull
+#         n = len(hull)
+
+#         # Draw the convext hull
+#         for j in range(0,n):
+#             cv2.line(im, hull[j], hull[ (j+1) % n], (255,0,0), 3)
+
+#     # Display results 
+#     cv2.imshow("Results", im)
+#     cv2.waitKey(0)
+
+
+
+
+======================================= pil.py ==============================================
+from pdf_2Img import convert_pdf_to_img
+import numpy as np
+import imutils
+from glob import glob
+import cv2
+
+from pdf2image.exceptions import (
+    PDFInfoNotInstalledError,
+    PDFPageCountError,
+    PDFSyntaxError
+)
+
+# images = convert_pdf_to_img(r'C:\Users\V4SWHVY\Desktop\python_barCode\inputFiles\BarCode2.pdf')
+img = r'C:\Users\V4SWHVY\Desktop\python_barCode\images\image1.jpg'
+
+for file in glob(r"C:\Users\V4SWHVY\Desktop\python_barCode\barcode.jpg"):
+    image = cv2.imread(file)
+    # convert it to grayscale
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+    # compute the Scharr gradient magnitude representation of the images
+    # in both the x and y direction using OpenCV 2.4
+    ddepth = cv2.cv.CV_32F if imutils.is_cv2() else cv2.CV_32F
+    gradX = cv2.Sobel(gray, ddepth = ddepth, dx = 1, dy = 0, ksize = -1)
+    gradY = cv2.Sobel(gray, ddepth = ddepth, dx = 0, dy = 1, ksize = -1)
+
+    # subtract the y-gradient from the x-gradient
+    gradient = cv2.subtract(gradX, gradY)
+    gradient = cv2.convertScaleAbs(gradient)
+
+    # blur and threshold the image
+    blurred = cv2.blur(gradient, (9, 9))
+    (_, thresh) = cv2.threshold(blurred, 100, 255, cv2.THRESH_BINARY)
+
+    # construct a closing kernel and apply it to the thresholded image
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (21, 7))
+    closed = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+
+    # perform a series of erosions and dilations
+    closed = cv2.erode(closed, None, iterations = 4)
+    closed = cv2.dilate(closed, None, iterations = 4)
+
+    # find the contours in the thresholded image, then sort the contours
+    # by their area, keeping only the largest one
+    cnts = cv2.findContours(closed.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cnts = imutils.grab_contours(cnts)
+    c = sorted(cnts, key = cv2.contourArea, reverse = True)[0]
+
+    # compute the rotated bounding box of the largest contour
+    rect = cv2.minAreaRect(c)
+    box = cv2.cv.BoxPoints(rect) if imutils.is_cv2() else cv2.boxPoints(rect)
+    box = np.int0(box)
+
+    # draw a bounding box arounded the detected barcode and display the
+    min_y = int(np.min(box[:,-1]))
+    max_y = int(np.max(box[:,-1]))
+    min_x = int(np.min(box[:,0]))
+    max_x = int(np.max(box[:,0]))
+    image = image[min_y:max_y, min_x:max_x]
+    # save cropped image
+    cv2.imwrite(f"cropped.jpg", image)
+
+============================================ img2txt ==============================================
+import easyocr
+reader = easyocr.Reader(['en']) # need to run only once to load model into memory
+result = reader.readtext(r'C:\Users\V4SWHVY\Desktop\python_barCode\cropped.jpg')
+print(result[0][-2])
+
+#Capture.PNG
+
